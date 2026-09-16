@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-suivi-bebe.png">
+<title>Mon bébé ❤️</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f1f6fc;color:#263442;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:760px;margin:auto;padding:20px 14px 40px}h1{font-size:28px;margin:0}.date{color:#738092;margin:4px 0 18px;text-transform:capitalize}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.card,.panel{background:#fff;border-radius:22px;padding:16px;box-shadow:0 3px 14px #00000008}
+.stat b{display:block;font-size:22px}.stat span{color:#7b8794;font-size:13px}.panel{margin-top:12px}.panel h2{margin:0 0 10px;font-size:17px}.big{font-size:23px;font-weight:800}.muted{color:#748191;font-size:14px}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}button{border:0;border-radius:16px;padding:13px;font-size:14px;font-weight:750;background:#e1edff;color:#3e6697}button.primary{background:#416b9f;color:#fff}.danger{background:#fff0f0;color:#b4524c}
+.event{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #e7edf3}.event:last-child{border-bottom:0}.ico{font-size:22px}.grow{flex:1}.del{padding:6px 10px;background:#f1f3f5;color:#9099a3}
+.calendar-head{display:flex;align-items:center;justify-content:space-between}.cal-title{text-transform:capitalize;font-weight:800;font-size:19px}.calendar-head button{padding:8px 13px}.days .day{padding:8px;border-radius:12px;background:transparent;color:#263442;font-size:14px;font-weight:650}.days .day.sel{background:#dceaff;color:#315d91}.days .day.has{font-weight:850}.days .day.other{visibility:hidden;pointer-events:none}
+.week,.days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;text-align:center}.week{margin:14px 0 6px;color:#8a95a2;font-size:12px}.day{min-height:43px;padding:10px 2px;border-radius:12px;font-size:14px}.day.other{visibility:hidden}.day.sel{background:#416b9f;color:#fff;font-weight:800}.day.has:after{content:"";display:block;width:5px;height:5px;border-radius:50%;background:currentColor;margin:4px auto 0}
+.note{background:#f7f9fb;border-radius:14px;padding:12px;color:#697684;font-size:13px;margin-top:12px}
+dialog{border:0;border-radius:22px;width:min(92vw,430px);padding:18px;box-shadow:0 10px 50px #0006}dialog::backdrop{background:#0005}
+label{display:block;font-size:13px;font-weight:700;margin:10px 0}input,select{width:100%;padding:11px;border:1px solid #d9e0e8;border-radius:11px;font-size:16px;margin-top:5px}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.dlg-actions{display:flex;gap:8px;margin-top:14px}.dlg-actions button{flex:1}
+@media(max-width:500px){main{padding:16px 12px}.stat{padding:13px 8px}.stat b{font-size:18px}.actions button{padding:11px 4px;font-size:12px}}
+</style>
+</head>
+<body>
+<main>
+<h1>Mon bébé ❤️</h1><div id="date" class="date"></div>
+
+<div class="grid">
+<div class="card stat"><b id="milk">0 ml</b><span>Biberons aujourd’hui</span></div>
+<div class="card stat"><b id="sleepStat">0h00</b><span>Sommeil aujourd’hui</span></div>
+<div class="card stat"><b id="diapers">0</b><span>Couches aujourd’hui</span></div>
+</div>
+
+<section class="panel"><h2>🍼 Biberon</h2><div id="feedSummary" class="muted"></div></section>
+<section class="panel"><h2>😴 Sommeil</h2><div id="sleepSummary" class="muted"></div></section>
+<section class="panel"><h2>💧 Couches</h2><div id="diaperSummary" class="muted"></div></section>
+
+<div class="actions"><button onclick="openFeed()">🍼 Biberon</button><button onclick="openSleep()">😴 Sommeil</button><button onclick="openDiaper()">💧 Couche</button></div>
+
+<section class="panel">
+<h2>📅 Calendrier</h2>
+<div class="calendar-head"><button onclick="changeMonth(-1)">‹</button><div id="calTitle" class="cal-title"></div><button onclick="changeMonth(1)">›</button></div>
+<div class="week"><span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span></div>
+<div id="days" class="days"></div>
+</section>
+
+<section class="panel"><h2>📝 Journée <span id="selectedDayLabel" class="muted"></span></h2><div id="timeline"></div>
+<div class="note">Historique conservé pendant 30 jours. Les données restent sur cet appareil. Les intervalles de biberons utilisés pour les prévisions sont limités à 24 h.</div>
+<button class="danger" style="margin-top:10px" onclick="clearToday()">Effacer les événements du jour</button></section>
+</main>
+
+<dialog id="dlg"><h2 id="dlgTitle"></h2><form id="form"></form><div class="dlg-actions"><button type="button" onclick="dlg.close()">Annuler</button><button class="primary" type="button" id="saveBtn" onclick="saveEvent()">Enregistrer</button></div></dialog>
+
+<script>
+const KEY="bebe_suivi_v4", OLD_KEYS=["bebe_suivi_v3","bebe_suivi_v2","bebe_suivi_v1"];
+const seed=[
+{id:"seed-15-001",date:"2026-09-15",mode:"feed",time:"00:10",amount:210},
+{id:"seed-15-002",date:"2026-09-15",mode:"feed",time:"05:36",amount:210},
+{id:"seed-15-003",date:"2026-09-15",mode:"feed",time:"11:16",amount:210},
+{id:"seed-15-004",date:"2026-09-15",mode:"feed",time:"16:36",amount:210},
+{id:"seed-15-005",date:"2026-09-15",mode:"feed",time:"20:40",amount:210},
+{id:"seed-sleep-15",date:"2026-09-15",mode:"sleep",start:"21:15",startDate:"2026-09-15",end:"02:10",endDate:"2026-09-16",duration:295},
+{id:"seed-feed-16",date:"2026-09-16",mode:"feed",time:"02:15",amount:210},
+{id:"seed-sleep-16",date:"2026-09-16",mode:"sleep",start:"02:20",startDate:"2026-09-16",end:null,endDate:null,duration:0}
+];
+
+let data=JSON.parse(localStorage.getItem(KEY)||"null");
+if(!Array.isArray(data)) data=[];
+const existingIds=new Set(data.map(e=>String(e.id)));
+for(const k of OLD_KEYS){
+  const x=JSON.parse(localStorage.getItem(k)||"null");
+  if(Array.isArray(x)) for(const e of x){
+    if(!existingIds.has(String(e.id))){data.push(e);existingIds.add(String(e.id))}
+  }
+}
+if(!data.length) data=seed.map(e=>({...e}));
+let mode="",calDate=new Date(),selectedDay=today();
+
+const pad=n=>String(n).padStart(2,"0");
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+const save=()=>localStorage.setItem(KEY,JSON.stringify(data));
+const fmtMin=m=>{m=Math.max(0,Math.round(m));return `${Math.floor(m/60)}h${pad(m%60)}`};
+const addDays=(s,n)=>{const d=new Date(s+"T12:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+const dt=(d,t)=>new Date(`${d}T${t}:00`);
+
+function prune(){
+ const cutoff=addDays(today(),-29);
+ data=data.filter(e=>(e.date||e.startDate||"9999-99-99")>=cutoff);
+ save();
+}
+function activeSleep(){
+ return data.filter(e=>e.mode==="sleep"&&!e.end)
+   .sort((a,b)=>dt(a.startDate||a.date,a.start)-dt(b.startDate||b.date,b.start)).at(-1)||null;
+}
+function bounds(e){
+ const sd=e.startDate||e.date;
+ let ed=e.endDate;
+ if(e.end&&!ed)ed=e.end<=e.start?addDays(sd,1):sd;
+ return {start:dt(sd,e.start),end:e.end?dt(ed,e.end):new Date()};
+}
+function minutesOnDay(e,day){
+ const b=bounds(e),a=dt(day,"00:00"),z=dt(addDays(day,1),"00:00");
+ return Math.max(0,Math.round((Math.min(b.end,z)-Math.max(b.start,a))/60000));
+}
+function currentMinutes(e){return Math.max(0,Math.round((Date.now()-bounds(e).start)/60000))}
+function dayEvents(day=today()){return data.filter(e=>e.date===day)}
+function feedsAll(){return data.filter(e=>e.mode==="feed"&&e.date&&e.time).sort((a,b)=>dt(a.date,a.time)-dt(b.date,b.time))}
+function addTime(t,m){let x=(+t.slice(0,2))*60+(+t.slice(3))+m;x=(x%1440+1440)%1440;return `${pad(Math.floor(x/60))}:${pad(x%60)}`}
+
+function openFeed(){
+ mode="feed";dlgTitle.textContent="🍼 Nouveau biberon";saveBtn.textContent="Enregistrer";
+ form.innerHTML=`<div class="row"><label>Heure<input id="time" type="time" value="${new Date().toTimeString().slice(0,5)}"></label><label>Quantité (ml)<input id="amount" type="number" value="210" min="1"></label></div>`;dlg.showModal();
+}
+function openDiaper(){
+ mode="diaper";dlgTitle.textContent="💧 Nouvelle couche";saveBtn.textContent="Enregistrer";
+ form.innerHTML=`<label>Heure<input id="time" type="time" value="${new Date().toTimeString().slice(0,5)}"></label><label>Type<select id="kind"><option value="pipi">💧 Pipi</option><option value="selle">💩 Selle</option><option value="mixte">💧💩 Les deux</option></select></label>`;dlg.showModal();
+}
+function openSleep(){
+ const a=activeSleep();
+ if(a){
+  mode="sleepEnd";dlgTitle.textContent="😴 Réveil";saveBtn.textContent="Terminer le sommeil";
+  form.innerHTML=`<div class="note">Sommeil commencé à ${a.start}</div><label>Heure du réveil<input id="end" type="time" value="${new Date().toTimeString().slice(0,5)}"></label>`;
+ }else{
+  mode="sleepStart";dlgTitle.textContent="😴 Début du sommeil";saveBtn.textContent="Commencer le sommeil";
+  form.innerHTML=`<label>Heure de début<input id="start" type="time" value="${new Date().toTimeString().slice(0,5)}"></label>`;
+ }
+ dlg.showModal();
+}
+function saveEvent(){
+ if(mode==="sleepEnd"){
+  const a=activeSleep();if(!a)return;
+  a.end=end.value;a.endDate=a.end<=a.start?addDays(a.startDate||a.date,1):(a.startDate||a.date);
+  a.duration=Math.max(0,Math.round((dt(a.endDate,a.end)-dt(a.startDate||a.date,a.start))/60000));
+ }else if(mode==="sleepStart"){
+  data.push({id:Date.now(),date:today(),mode:"sleep",start:start.value,startDate:today(),end:null,endDate:null,duration:0});
+ }else if(mode==="feed"){
+  data.push({id:Date.now(),date:today(),mode:"feed",time:time.value,amount:+amount.value});
+ }else{
+  data.push({id:Date.now(),date:today(),mode:"diaper",time:time.value,kind:kind.value});
+ }
+ save();dlg.close();render();renderCalendar();
+}
+
+function render(){
+ const day=today(),es=dayEvents(day),fs=es.filter(e=>e.mode==="feed"),ds=es.filter(e=>e.mode==="diaper"),active=activeSleep();
+ const viewEvents=dayEvents(selectedDay);
+ const viewSleeps=data.filter(e=>e.mode==="sleep"&&minutesOnDay(e,selectedDay)>0);
+ milk.textContent=fs.reduce((s,e)=>s+Number(e.amount||0),0)+" ml";
+ diapers.textContent=ds.length;
+
+ // Total de sommeil du jour = toutes les minutes réellement situées sur cette date.
+ const sleeps=data.filter(e=>e.mode==="sleep"&&minutesOnDay(e,day)>0);
+ const total=sleeps.reduce((s,e)=>s+minutesOnDay(e,day),0);
+// Si un sommeil est en cours, la grande case affiche uniquement cette période en cours.
+// Sinon, elle affiche le total de sommeil enregistré aujourd’hui.
+sleepStat.textContent=fmtMin(total);
+
+ if(fs.length){
+  const last=feedsAll().at(-1),af=feedsAll(),ints=[];
+  for(let i=1;i<af.length;i++){const p=Math.round((dt(af[i].date,af[i].time)-dt(af[i-1].date,af[i-1].time))/60000);if(p>0&&p<=1440)ints.push(p)}
+  const r=ints.slice(-20),avg=r.length?Math.round(r.reduce((a,b)=>a+b,0)/r.length):null,f=fs.slice().sort((a,b)=>b.time.localeCompare(a.time))[0];
+  feedSummary.innerHTML=`<div class="big">${f.time} · ${f.amount} ml</div><div class="muted">Dernier biberon</div>${avg?`<div style="margin-top:8px">🔮 Prochain créneau estimé : <b>${addTime(last.time,avg)}</b> <span class="muted">(moyenne ${fmtMin(avg)}, ${r.length} intervalles)</span></div>`:""}`;
+ }else feedSummary.innerHTML="Aucun biberon aujourd’hui";
+
+ // Le bloc "Sommeil" montre la durée de la période EN COURS, pas le cumul du jour.
+ if(active){
+  sleepSummary.innerHTML=`<div class="big">😴 ${fmtMin(currentMinutes(active))}</div><div class="muted">Sommeil en cours · depuis ${active.start}</div>`;
+ }else if(sleeps.length){
+  sleepSummary.innerHTML=`<div class="big">${fmtMin(total)}</div><div class="muted">Sommeil enregistré aujourd’hui</div>`;
+ }else sleepSummary.innerHTML="Aucun sommeil enregistré";
+
+ diaperSummary.innerHTML=ds.length?`💧 ${ds.filter(e=>e.kind==="pipi"||e.kind==="mixte").length} · 💩 ${ds.filter(e=>e.kind==="selle"||e.kind==="mixte").length}`:"Aucune couche enregistrée";
+
+ const timelineEvents=viewEvents.concat(data.filter(e=>e.mode==="sleep"&&!viewEvents.includes(e)&&minutesOnDay(e,selectedDay)>0));
+ const all=timelineEvents.slice().sort((a,b)=>{
+  const ta=a.mode==="sleep"?(a.startDate||a.date)+"T"+a.start:(a.date||"")+"T"+a.time;
+  const tb=b.mode==="sleep"?(b.startDate||b.date)+"T"+b.start:(b.date||"")+"T"+b.time;
+  return ta.localeCompare(tb);
+ });
+ selectedDayLabel.textContent=selectedDay===today()?"":`· ${new Date(selectedDay+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long"})}`;
+ timeline.innerHTML=all.length?all.map(e=>{
+  const t=e.mode==="sleep"?`${e.start}${e.end?"–"+e.end:"–…"}`:e.time;
+  const txt=e.mode==="feed"?`${e.amount} ml`:e.mode==="sleep"?(e.end?fmtMin(e.duration):"Sommeil en cours…"):e.kind==="pipi"?"Pipi":e.kind==="selle"?"Selle":"Pipi + selle";
+  return `<div class="event"><span class="ico">${e.mode==="feed"?"🍼":e.mode==="sleep"?"😴":"💧"}</span><div class="grow"><b>${t}</b><br><span class="muted">${txt}</span></div><button class="del" onclick="delEvent('${e.id}')">×</button></div>`;
+ }).join(""):`Aucun événement le ${new Date(selectedDay+"T12:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"long"})}`;
+}
+function delEvent(id){data=data.filter(e=>String(e.id)!==String(id));save();render();renderCalendar()}
+function clearToday(){if(confirm("Effacer les événements du jour ?")){data=data.filter(e=>e.date!==today());save();render();renderCalendar()}}
+
+function renderCalendar(){
+ const y=calDate.getFullYear(),m=calDate.getMonth(),first=(new Date(y,m,1).getDay()+6)%7,count=new Date(y,m+1,0).getDate();
+ calTitle.textContent=new Date(y,m,1).toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
+ days.innerHTML="";
+ // Toujours 6 lignes de 7 cases, mais les cases hors mois restent invisibles et non numérotées.
+ for(let i=0;i<42;i++){
+  const n=i-first+1;
+  if(n<1||n>count){days.innerHTML+=`<div class="day other"></div>`;continue}
+  const d=`${y}-${pad(m+1)}-${pad(n)}`,cls=`day${d===selectedDay?" sel":""}${data.some(e=>e.date===d||e.startDate===d||e.endDate===d)?" has":""}`;
+  days.innerHTML+=`<button class="${cls}" onclick="selectDay('${d}')">${n}</button>`;
+ }
+}
+function selectDay(d){selectedDay=d;render();renderCalendar();document.getElementById("timeline").scrollIntoView({behavior:"smooth",block:"nearest"})}
+function changeMonth(n){calDate.setMonth(calDate.getMonth()+n);renderCalendar()}
+
+date.textContent=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+prune();render();renderCalendar();setInterval(()=>{if(activeSleep())render()},30000);
+</script>
+</body>
+</html>
