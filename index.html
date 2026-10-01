@@ -18,7 +18,7 @@ h1{font-size:28px;margin:0}.date{color:var(--muted);font-size:14px;margin-top:4p
 .event{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.event:last-child{border-bottom:0}.ico{font-size:25px}.grow{flex:1}.edit,.del{border:0;border-radius:10px;font-size:18px;width:38px;height:38px}.edit{background:#eef6ff;color:#5b91c9}.del{background:#fff4f2;color:#b59d95}
 input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:13px;background:#fff;font-size:16px;margin-top:5px}label{display:block;font-size:13px;color:var(--muted);margin:10px 0 0}
 dialog{border:0;border-radius:24px;width:min(92%,430px);padding:20px;background:#fff;box-shadow:0 20px 70px #0003}dialog::backdrop{background:#0004}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.modal-actions{display:flex;gap:10px;margin-top:16px}.modal-actions button{flex:1;padding:13px;border:0;border-radius:14px;font-weight:700}.primary{background:var(--accent);color:#fff}.secondary{background:#f3eeeb;color:var(--ink)}
-.note{background:#eef6ff;border-radius:15px;padding:11px;font-size:13px;color:var(--muted);margin-top:10px}.history-day{padding:10px 0;border-bottom:1px solid var(--line)}.history-day:last-child{border-bottom:0}.history-day b{display:block;margin-bottom:5px}.history-item{font-size:13px;color:var(--muted);line-height:1.6}
+.note{background:#eef6ff;border-radius:15px;padding:11px;font-size:13px;color:var(--muted);margin-top:10px}.history-day{padding:10px 0;border-bottom:1px solid var(--line)}.history-day:last-child{border-bottom:0}.history-day b{display:block;margin-bottom:5px}.history-item{font-size:13px;color:var(--muted);margin:3px 0}
 .calendar-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .calendar-head button{border:0;background:var(--soft);border-radius:12px;padding:8px 12px;font-size:18px}
 .calendar-title{font-weight:700;text-transform:capitalize}
@@ -67,8 +67,13 @@ dialog{border:0;border-radius:24px;width:min(92%,430px);padding:20px;background:
 <button onclick="openDiaper()">💧<br>Couche</button>
 </div>
 
-<div class="card"><h2>📚 Historique</h2><div id="history"></div></div><div class="card"><h2>📋 Résumé de la journée</h2><div id="timeline"></div></div>
-<div class="note">🔮 Les données sont conservées pendant 30 jours. Les prédictions utilisent les intervalles réellement enregistrés (jusqu’à 24 h). Elles restent des estimations : les signes de faim de bébé passent avant l’horloge.</div>
+<div class="card">
+  <h2>📚 Historique</h2>
+  <div class="muted" style="margin-bottom:10px">Les événements enregistrés restent disponibles dans l’application.</div>
+  <div id="history"></div>
+</div>
+<div class="card"><h2>📋 Résumé de la journée</h2><div id="timeline"></div></div>
+<div class="note">🔮 Les données sont conservées dans l’historique de l’application. Les prédictions utilisent les intervalles réellement enregistrés (jusqu’à 24 h). Elles restent des estimations : les signes de faim de bébé passent avant l’horloge.</div>
 </main>
 
 <dialog id="dlg">
@@ -360,6 +365,16 @@ function add(t,m){
   return `${pad(Math.floor(x/60))}:${pad(x%60)}`;
 }
 
+
+function predictionIntervalsText(){
+  const feeds=allFeeds(), vals=[];
+  for(let i=1;i<feeds.length;i++){
+    const p=Math.round((eventDateTime(feeds[i])-eventDateTime(feeds[i-1]))/60000);
+    if(p>0&&p<=MAX_FEED_INTERVAL) vals.push(fmtMin(p));
+  }
+  return vals.slice(-5).join(' · ');
+}
+
 function predictionFromFeeds(){
   const feeds=allFeeds();
   const ints=[];
@@ -386,28 +401,29 @@ function sleepEventsForDay(day=today()){
 }
 
 
-function predictionIntervalsText(){
-  const feeds=allFeeds(), vals=[];
-  for(let i=1;i<feeds.length;i++){
-    const p=Math.round((eventDateTime(feeds[i])-eventDateTime(feeds[i-1]))/60000);
-    if(p>0 && p<=MAX_FEED_INTERVAL) vals.push(fmtMin(p));
-  }
-  return vals.slice(-5).join(' · ');
-}
 function renderHistory(){
   const box=document.getElementById('history');
   if(!box)return;
   const days={};
   data.forEach(e=>{
     const d=e.mode==='sleep'?(e.startDate||e.date):e.date;
-    if(d)(days[d]??=[]).push(e);
+    if(!d)return;
+    (days[d]??=[]).push(e);
   });
   const keys=Object.keys(days).sort().reverse();
-  box.innerHTML=keys.length?keys.map(day=>{
+  if(!keys.length){
+    box.innerHTML='<span class="muted">Aucun historique enregistré.</span>';
+    return;
+  }
+  box.innerHTML=keys.map(day=>{
     const ev=days[day].slice().sort((a,b)=>eventDateTime(a)-eventDateTime(b));
-    const items=ev.map(e=>e.mode==='feed'?`🍼 ${e.time} · ${e.amount} ml`:e.mode==='diaper'?`💧 ${e.time} · ${e.kind==='pipi'?'Pipi':e.kind==='selle'?'Selle':'Pipi + selle'}`:`😴 ${e.start}${e.end?'–'+e.end:''}${e.duration?` · ${fmtMin(e.duration)}`:''}`).join('<br>');
+    const items=ev.map(e=>{
+      if(e.mode==='feed') return `🍼 ${e.time} · ${e.amount} ml`;
+      if(e.mode==='diaper') return `💧 ${e.time} · ${e.kind==='pipi'?'Pipi':e.kind==='selle'?'Selle':'Pipi + selle'}`;
+      return `😴 ${e.start}${e.end?'–'+e.end:''}${e.duration?` · ${fmtMin(e.duration)}`:''}`;
+    }).join('<br>');
     return `<div class="history-day"><b>${fmtDate(day)}</b><div class="history-item">${items}</div></div>`;
-  }).join(''):'<span class="muted">Aucun historique enregistré.</span>';
+  }).join('');
 }
 
 function render(){
@@ -429,9 +445,18 @@ function render(){
   if(last){
     const p=predictionFromFeeds();
     feedSummary.innerHTML=`<div class="big">${last.time} · ${last.amount} ml</div>
-      <div class="muted">Dernier biberon</div>
-      ${p.avg?`<div style="margin-top:8px">🔮 Prochain créneau estimé : <b>${add(last.time,p.avg)}</b>
-      <span class="muted">(basé sur ${fmtMin(p.avg)} de moyenne, ${p.recentCount} intervalles)</span></div>`:''}`;
+       <div class="muted">Dernier biberon</div>
+       <div style="margin-top:10px;padding:10px 12px;background:#eef6ff;border-radius:14px">
+         🔵 <b>Prédiction +5 h</b><br>
+         <span style="font-size:18px;font-weight:700">${add(last.time,300)}</span>
+         <div class="muted">${last.time} → ${add(last.time,300)}</div>
+       </div>
+       ${p.avg?`<div style="margin-top:8px;padding:10px 12px;background:#f4efff;border-radius:14px">
+         🟣 <b>Prédiction avec les intervalles trouvés</b><br>
+         <span style="font-size:18px;font-weight:700">${add(last.time,p.avg)}</span>
+         <div class="muted">Moyenne des ${p.recentCount} derniers intervalles : ${fmtMin(p.avg)}</div>
+         <div class="muted" style="margin-top:4px">⏱️ Intervalles réels : ${predictionIntervalsText()}</div>
+       </div>`:''}`;
   }else{
     feedSummary.innerHTML='<span class="muted">Aucun biberon aujourd’hui</span>';
   }
